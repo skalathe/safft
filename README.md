@@ -11,3 +11,5 @@ bitrev_complex.cpp files are benchmarks with example of usage
 
 bitrev omp version is still WIP and doesnt scale very well
 
+fft4avx_recit_par.cpp omp version have bitrev commented and waits for completion of omp bitrev
+
