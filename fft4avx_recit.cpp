@@ -1,5 +1,6 @@
 #include <bits/stdc++.h>
 #include <immintrin.h>
+#include "bitrev_complex.hpp"
 
 #define _MM256_TRANSPOSE_4x4_PD(row0,row1,row2,row3) \
     do { \
@@ -199,8 +200,8 @@ struct fft_plan {
         __m256d re2 = _mm256_load_pd(data 		+ N4 * 2);
 				__m256d im2 = _mm256_load_pd(data + 4 + N4 * 2);
         __m256d re3 = _mm256_load_pd(data 		+ N4 * 3);
-				__m256d im3 = _mm256_load_pd(data + 4 + N4 * 3);    
-                   
+				__m256d im3 = _mm256_load_pd(data + 4 + N4 * 3);
+
         __m256d sum02re = _mm256_add_pd( re0, re2 );
         __m256d sum02im = _mm256_add_pd( im0, im2 );
         __m256d sum13re = _mm256_add_pd( re1, re3 );
@@ -259,7 +260,7 @@ struct fft_plan {
 				__m256d im1 = _mm256_load_pd(data + 12);
         __m256d re2 = _mm256_load_pd(data + 16);
 				__m256d im2 = _mm256_load_pd(data + 20);
-        __m256d re3 = _mm256_load_pd(data + 24);       
+        __m256d re3 = _mm256_load_pd(data + 24);
         __m256d im3 = _mm256_load_pd(data + 28);
 
         _MM256_TRANSPOSE_4x4_PD(re0,re1,re2,re3);
@@ -310,7 +311,7 @@ struct fft_plan {
 	#define TWID 1
 	#define TOP(ITEM)  stack[st_ptr-1][ITEM]
 	#define TOP_(ITEM) stack_[st_ptr-1][ITEM]
-	uint32_t st_ptr = 0; 
+	uint32_t st_ptr = 0;
 
 	inline void st_push( size_t size, double * data, double * twiddle ) {
 		stack [st_ptr]  [SIZE] = size;
@@ -335,7 +336,7 @@ struct fft_plan {
 		while ( st_ptr ) { // stack not empty
 
 			if ( st_next() ) {
-				
+
 				if ( TOP(SIZE) == 1024 ) {
 
 					double * subdata = TOP_(DATA);
@@ -418,8 +419,8 @@ struct fft_plan {
 					st_push( N4, safe, TOP_(TWID) + 6 * N4 );
 				}
 
-			} else st_pop();			
-		} 		
+			} else st_pop();
+		}
 	}
 
     void fft( const double * in, double * out ) {
@@ -477,13 +478,13 @@ struct fft_plan {
 
 		}
 
-		revbin_permute( out, size );
+		//revbin_permute( out, size );
 
     }
 
 };
 
-void test_output( size_t N ) {
+/*void test_output( size_t N ) {
 
 	double * input = (double*)aligned_alloc(native_alignment, N * 2 * sizeof(double));
 	double * output = (double*)aligned_alloc(native_alignment, N * 2 * sizeof(double));
@@ -503,21 +504,7 @@ void test_output( size_t N ) {
 
 	std::cout << std::endl;
 
-}
-
-uint32_t ipow( uint32_t base, uint32_t exp )
-{
-    uint32_t result = 1;
-    for ( ; ; ) {
-        if (exp & 1)
-            result *= base;
-        exp >>= 1;
-        if ( !exp )
-            break;
-        base *= base;
-    }
-    return result;
-}
+}*/
 
 template <typename T>
 constexpr inline std::uint32_t log_2( T n )
@@ -525,10 +512,10 @@ constexpr inline std::uint32_t log_2( T n )
     return (n > 1) ? 1 + log_2(n >> 1) : 0;
 }
 
-template <typename T>
-void time2n( uint32_t n, uint32_t base, uint32_t tests = 10 ) {
+template <typename T, uint32_t n>
+void time2n( uint32_t tests = 10 ) {
 
-    uint32_t m = ipow(base,n); // !!! base must be same like radix number ( radix4 -> base 4 )
+    uint32_t m = 1 << n;
 
     using namespace std::chrono;
 
@@ -538,36 +525,37 @@ void time2n( uint32_t n, uint32_t base, uint32_t tests = 10 ) {
     T * input  = (T*)aligned_alloc(native_alignment, 2 * m * sizeof(T));
     T * output = (T*)aligned_alloc(native_alignment, 2 * m * sizeof(T));
 
-	if ( base == 4 ) {
+    fft_plan FFT( m );
+    BitRev<T, 6, n> br;
+    T * cb = br.allocate();
 
-		fft_plan FFT( m );
+    for ( uint32_t k = 0; k < tests; ++k ) {
 
-		for ( uint32_t k = 0; k < tests; ++k ) {
+        for ( uint32_t i = 0; i < m; ++i ) {
+            input[i*2]   = (T)0.;
+            input[i*2+1] = (T)0.;
+        }
 
-		    for ( uint32_t i = 0; i < m; ++i ) {
-                input[i*2]   = (T)0.;
-                input[i*2+1] = (T)0.;
-            }
+        high_resolution_clock::time_point t1 = high_resolution_clock::now();
 
-		    high_resolution_clock::time_point t1 = high_resolution_clock::now();
+        FFT.fft ( input, output );
 
-		    FFT.fft ( input, output );
+        br.reverse(input, cb);
 
-		    high_resolution_clock::time_point t2 = high_resolution_clock::now();
+        high_resolution_clock::time_point t2 = high_resolution_clock::now();
 
-		    duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+        duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
 
-		    time[k] = time_span;
+        time[k] = time_span;
 
-		    // 5 * log_2(n) / time
+        // 5 * log_2(n) / time
 
-		    mflops[k] = 5 * m * log_2(m) / (std::log(2.0)*time_span.count() * 1000000.0F);
+        mflops[k] = 5 * m * log_2(m) / (std::log(2.0)*time_span.count() * 1000000.0F);
 
-		}
+    }
 
-        FFT.fft_free();
-	}
-
+    FFT.fft_free();
+    free(cb);
     free(input);
     free(output);
 
@@ -585,20 +573,13 @@ void time2n( uint32_t n, uint32_t base, uint32_t tests = 10 ) {
 
 }
 
-void test_speed ( void ) {
-    std::cout<<"#size"<<'\t'<<"speed(mflops)"<<'\t'<<"time(ms) r4"<<std::endl;
-    for ( int i = 3; i < 13; ++i ) time2n<double>(i,4);
-}
-
 
 int main(void)
 {
-		/*/
-		test_output(64);
-		test_output(1024);
-		test_output(4096);
-		/*/
-    test_speed();
-		//*/
+
+        std::cout<<"#size"<<'\t'<<"speed(mflops)"<<'\t'<<"time(ms) r4"<<std::endl;
+
+        time2n<double,24>();
+
 	return 0;
 }
